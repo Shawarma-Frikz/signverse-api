@@ -12,6 +12,7 @@ class User(Base):
     display_name = Column(String, nullable=True)
     preferred_language = Column(String, default="fr")
     is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)  # NEW
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
