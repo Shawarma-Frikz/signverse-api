@@ -33,3 +33,8 @@ class TokenResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class UserUpdate(BaseModel):
+    display_name: str | None = None
+    preferred_language: str | None = None

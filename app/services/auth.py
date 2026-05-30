@@ -4,6 +4,7 @@ from app.models.user import User
 from app.schemas.user import UserRegister, UserLogin
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.mail import generate_verification_token, send_verification_email
+from app.schemas.user import UserRegister, UserLogin, UserUpdate
 
 
 async def register_user(
@@ -76,3 +77,22 @@ def login_user(db: Session, data: UserLogin) -> dict:
         "refresh_token": refresh_token,
         "token_type": "bearer"
     }
+
+def update_user(db: Session, user: User, data: UserUpdate) -> User:
+    # Only update fields that were actually sent
+    if data.display_name is not None:
+        user.display_name = data.display_name
+
+    if data.preferred_language is not None:
+        # Validate language is one we support
+        allowed_languages = ["fr", "ar", "en"]
+        if data.preferred_language not in allowed_languages:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Language must be one of: {', '.join(allowed_languages)}"
+            )
+        user.preferred_language = data.preferred_language
+
+    db.commit()
+    db.refresh(user)
+    return user
