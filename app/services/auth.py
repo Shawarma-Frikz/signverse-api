@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status, BackgroundTasks
 from app.models.user import User
-from app.schemas.user import UserRegister
-from app.core.security import hash_password
+from app.schemas.user import UserRegister, UserLogin
+from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.mail import generate_verification_token, send_verification_email
 
 
@@ -11,7 +11,6 @@ async def register_user(
     data: UserRegister,
     background_tasks: BackgroundTasks
 ) -> User:
-    # Check if email already exists
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(
@@ -19,7 +18,6 @@ async def register_user(
             detail="Email already registered"
         )
 
-    # Hash password and create user
     new_user = User(
         email=data.email,
         hashed_password=hash_password(data.password),
@@ -32,10 +30,49 @@ async def register_user(
     db.commit()
     db.refresh(new_user)
 
-    # Generate token and send verification email in the background
-    # Background task means the API responds immediately without
-    # waiting for the email to send
     token = generate_verification_token(new_user.email)
     background_tasks.add_task(send_verification_email, new_user.email, token)
 
     return new_user
+
+
+def login_user(db: Session, data: UserLogin) -> dict:
+    # Find user by email
+    user = db.query(User).filter(User.email == data.email).first()
+
+    # Use same error for wrong email or wrong password
+    # Never tell the user which one is wrong (security)
+    invalid_error = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid email or password"
+    )
+
+    if not user:
+        raise invalid_error
+
+    if not verify_password(data.password, user.hashed_password):
+        raise invalid_error
+
+    # Block unverified users with a clear message
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before logging in"
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is disabled"
+        )
+
+    # Generate both tokens
+    token_data = {"sub": str(user.id), "email": user.email}
+    access_token = create_access_token(token_data)
+    refresh_token = create_refresh_token(token_data)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
