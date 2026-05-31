@@ -3,7 +3,7 @@ from fastapi import HTTPException, status, BackgroundTasks
 from app.models.user import User
 from app.schemas.user import UserRegister, UserLogin, UserUpdate, RefreshRequest
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
-from app.core.mail import generate_verification_token, send_verification_email
+from app.core.mail import generate_verification_token, send_verification_email, verify_token
 from app.core.security import (
     hash_password,
     verify_password,
@@ -11,7 +11,6 @@ from app.core.security import (
     create_refresh_token,
     decode_token
 )
-
 
 async def register_user(
     db: Session,
@@ -133,3 +132,32 @@ def refresh_access_token(data: RefreshRequest) -> dict:
         "access_token": new_access_token,
         "token_type": "bearer"
     }
+
+def verify_email(db: Session, token: str) -> dict:
+    # Decode the token — returns email if valid, None if expired or tampered
+    email = verify_token(token)
+
+    if email is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification link is invalid or has expired"
+        )
+
+    # Find the user
+    user = db.query(User).filter(User.email == email).first()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Already verified — no need to do it again
+    if user.is_verified:
+        return {"message": "Email already verified. You can log in."}
+
+    # Mark as verified
+    user.is_verified = True
+    db.commit()
+
+    return {"message": "Email verified successfully. You can now log in."}
