@@ -161,3 +161,28 @@ def verify_email(db: Session, token: str) -> dict:
     db.commit()
 
     return {"message": "Email verified successfully. You can now log in."}
+
+async def resend_verification(
+    db: Session,
+    email: str,
+    background_tasks: BackgroundTasks
+) -> dict:
+    user = db.query(User).filter(User.email == email).first()
+
+    # Always return the same response whether user exists or not
+    # Prevents user enumeration (attacker can't tell if email is registered)
+    generic_response = {
+        "message": "If that email is registered and unverified, a new verification link has been sent."
+    }
+
+    if user is None:
+        return generic_response
+
+    if user.is_verified:
+        return {"message": "This email is already verified. You can log in."}
+
+    # Generate fresh token and resend
+    token = generate_verification_token(user.email)
+    background_tasks.add_task(send_verification_email, user.email, token)
+
+    return generic_response

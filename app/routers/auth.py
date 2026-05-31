@@ -6,7 +6,8 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.schemas.user import (
     UserRegister, UserLogin, TokenResponse,
-    UserResponse, UserUpdate, RefreshRequest
+    UserResponse, UserUpdate, RefreshRequest,
+    ResendVerificationRequest
 )
 from app.services import auth as auth_service
 from app.models.user import User
@@ -54,3 +55,11 @@ def update_me(
 @router.get("/verify-email")
 def verify_email(token: str, db: Session = Depends(get_db)):
     return auth_service.verify_email(db, token)
+
+@router.post("/resend-verification")
+async def resend_verification(
+    data: ResendVerificationRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    return await auth_service.resend_verification(db, data.email, background_tasks)
