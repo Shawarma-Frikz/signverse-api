@@ -1,19 +1,18 @@
-from fastapi import APIRouter, Depends, status, BackgroundTasks
+from fastapi import APIRouter, Depends, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.schemas.user import (
-    UserRegister,
-    UserLogin,
-    TokenResponse,
-    UserResponse,
-    UserUpdate,
-    RefreshRequest
+    UserRegister, UserLogin, TokenResponse,
+    UserResponse, UserUpdate, RefreshRequest
 )
 from app.services import auth as auth_service
 from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -29,13 +28,14 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(data: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, data: UserLogin, db: Session = Depends(get_db)):
     return auth_service.login_user(db, data)
 
 
-@router.post("/refresh")
-def refresh(data: RefreshRequest):
-    return auth_service.refresh_access_token(data)
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
+    return auth_service.refresh_tokens(db, data.refresh_token)
 
 
 @router.get("/me", response_model=UserResponse)
