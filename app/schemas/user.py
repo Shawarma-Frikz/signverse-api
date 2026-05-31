@@ -38,3 +38,6 @@ class RefreshRequest(BaseModel):
 class UserUpdate(BaseModel):
     display_name: str | None = None
     preferred_language: str | None = None
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
