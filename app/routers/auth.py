@@ -50,3 +50,7 @@ def update_me(
     db: Session = Depends(get_db)
 ):
     return auth_service.update_user(db, current_user, data)
+
+@router.get("/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    return auth_service.verify_email(db, token)
