@@ -1,10 +1,16 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status, BackgroundTasks
 from app.models.user import User
-from app.schemas.user import UserRegister, UserLogin
+from app.schemas.user import UserRegister, UserLogin, UserUpdate, RefreshRequest
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.mail import generate_verification_token, send_verification_email
-from app.schemas.user import UserRegister, UserLogin, UserUpdate
+from app.core.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    decode_token
+)
 
 
 async def register_user(
@@ -96,3 +102,34 @@ def update_user(db: Session, user: User, data: UserUpdate) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+def refresh_access_token(data: RefreshRequest) -> dict:
+    # Decode the refresh token
+    payload = decode_token(data.refresh_token)
+
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Make sure it's actually a refresh token, not an access token
+    if payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Issue a brand new access token with the same user data
+    token_data = {
+        "sub": payload.get("sub"),
+        "email": payload.get("email")
+    }
+    new_access_token = create_access_token(token_data)
+
+    return {
+        "access_token": new_access_token,
+        "token_type": "bearer"
+    }
