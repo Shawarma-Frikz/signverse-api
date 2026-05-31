@@ -1,10 +1,18 @@
 import resend
 from itsdangerous import URLSafeTimedSerializer
 from app.core.config import settings
+import os
 
 resend.api_key = settings.resend_api_key
 
 serializer = URLSafeTimedSerializer(settings.secret_key)
+
+TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
+
+
+def _load_template(filename: str) -> str:
+    with open(os.path.join(TEMPLATES_DIR, filename), "r", encoding="utf-8") as f:
+        return f.read()
 
 
 def generate_verification_token(email: str) -> str:
@@ -31,31 +39,11 @@ def verify_reset_token(token: str) -> str | None:
 
 async def send_verification_email(email: str, token: str):
     verify_url = f"{settings.frontend_url}/api/v1/auth/verify-email?token={token}"
+    html = _load_template("verification_email.html").replace("{{verify_url}}", verify_url)
 
     resend.Emails.send({
         "from": settings.mail_from,
         "to": email,
         "subject": "Verify your SignVerse account",
-        "html": f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; background: #f4f4f4; padding: 40px;">
-          <div style="max-width: 500px; margin: 0 auto; background: white;
-                      border-radius: 12px; padding: 40px;">
-            <h1 style="color: #1E3A5F;">SignVerse</h1>
-            <p style="color: #525252; font-size: 16px;">
-              Thanks for signing up. Please verify your email address.
-            </p>
-            <a href="{verify_url}"
-               style="display: inline-block; margin: 24px 0; padding: 14px 28px;
-                      background: #00BCD4; color: white; border-radius: 8px;
-                      text-decoration: none; font-weight: 600;">
-              Verify My Email
-            </a>
-            <p style="color: #A3A3A3; font-size: 13px;">
-              This link expires in 24 hours.
-            </p>
-          </div>
-        </body>
-        </html>
-        """
+        "html": html,
     })
