@@ -3,7 +3,7 @@ from fastapi import HTTPException, status, BackgroundTasks
 from app.models.user import User
 from app.schemas.user import UserRegister, UserLogin, UserUpdate, RefreshRequest
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
-from app.core.mail import generate_verification_token, send_verification_email, verify_token
+from app.core.mail import generate_verification_token, send_verification_email, verify_token, send_welcome_email
 from app.core.security import (
     hash_password,
     verify_password,
@@ -133,8 +133,7 @@ def refresh_access_token(data: RefreshRequest) -> dict:
         "token_type": "bearer"
     }
 
-def verify_email(db: Session, token: str) -> dict:
-    # Decode the token — returns email if valid, None if expired or tampered
+def verify_email(db: Session, token: str, background_tasks: BackgroundTasks) -> dict:
     email = verify_token(token)
 
     if email is None:
@@ -143,7 +142,6 @@ def verify_email(db: Session, token: str) -> dict:
             detail="Verification link is invalid or has expired"
         )
 
-    # Find the user
     user = db.query(User).filter(User.email == email).first()
 
     if user is None:
@@ -152,13 +150,14 @@ def verify_email(db: Session, token: str) -> dict:
             detail="User not found"
         )
 
-    # Already verified — no need to do it again
     if user.is_verified:
         return {"message": "Email already verified. You can log in."}
 
-    # Mark as verified
     user.is_verified = True
     db.commit()
+
+    # Send welcome email as background task
+    background_tasks.add_task(send_welcome_email, user.email, user.display_name)
 
     return {"message": "Email verified successfully. You can now log in."}
 

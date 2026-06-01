@@ -47,3 +47,14 @@ async def send_verification_email(email: str, token: str):
         "subject": "Verify your SignVerse account",
         "html": html,
     })
+
+async def send_welcome_email(email: str, display_name: str):
+    name = display_name or email.split("@")[0]
+    html = _load_template("welcome_email.html").replace("{{display_name}}", name)
+
+    resend.Emails.send({
+        "from": settings.mail_from,
+        "to": email,
+        "subject": f"Welcome to SignVerse, {name} 👋",
+        "html": html,
+    })
