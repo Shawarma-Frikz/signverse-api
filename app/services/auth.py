@@ -1,9 +1,28 @@
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status, BackgroundTasks
+from fastapi import (
+    HTTPException,
+    status,
+    BackgroundTasks
+)
 from app.models.user import User
-from app.schemas.user import UserRegister, UserLogin, UserUpdate, RefreshRequest
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
-from app.core.mail import generate_verification_token, send_verification_email, verify_token, send_welcome_email
+from app.schemas.user import (
+    UserRegister,
+    UserLogin, UserUpdate,
+    RefreshRequest)
+from app.core.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_refresh_token
+)
+from app.core.mail import (
+    generate_verification_token,
+    send_reset_email,
+    send_verification_email,
+    verify_token,
+    send_welcome_email,
+    generate_reset_token
+)
 from app.core.security import (
     hash_password,
     verify_password,
@@ -183,5 +202,31 @@ async def resend_verification(
     # Generate fresh token and resend
     token = generate_verification_token(user.email)
     background_tasks.add_task(send_verification_email, user.email, token)
+
+    return generic_response
+
+async def forgot_password(
+    db: Session,
+    email: str,
+    background_tasks: BackgroundTasks
+) -> dict:
+    # Always return the same response — never reveal if email exists
+    generic_response = {
+        "message": "If that email is registered, a password reset link has been sent."
+    }
+
+    user = db.query(User).filter(User.email == email).first()
+
+    # User doesn't exist — return generic response silently
+    if user is None:
+        return generic_response
+
+    # User exists but hasn't verified email yet
+    if not user.is_verified:
+        return generic_response
+
+    # Generate reset token (1 hour expiry handled in verify_reset_token)
+    token = generate_reset_token(user.email)
+    background_tasks.add_task(send_reset_email, user.email, token)
 
     return generic_response

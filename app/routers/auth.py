@@ -1,4 +1,10 @@
-from fastapi import APIRouter, Depends, status, BackgroundTasks, Request
+from fastapi import (
+    APIRouter,
+    Depends,
+    status,
+    BackgroundTasks,
+    Request
+)
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -7,7 +13,7 @@ from app.core.dependencies import get_current_user
 from app.schemas.user import (
     UserRegister, UserLogin, TokenResponse,
     UserResponse, UserUpdate, RefreshRequest,
-    ResendVerificationRequest
+    ResendVerificationRequest, ForgotPasswordRequest
 )
 from app.services import auth as auth_service
 from app.models.user import User
@@ -67,3 +73,11 @@ async def resend_verification(
     db: Session = Depends(get_db)
 ):
     return await auth_service.resend_verification(db, data.email, background_tasks)
+
+@router.post("/forgot-password")
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    return await auth_service.forgot_password(db, data.email, background_tasks)
