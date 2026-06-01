@@ -7,8 +7,11 @@ from fastapi import (
 from app.models.user import User
 from app.schemas.user import (
     UserRegister,
-    UserLogin, UserUpdate,
-    RefreshRequest)
+    UserLogin,
+    UserUpdate,
+    RefreshRequest,
+    ResetPasswordRequest
+)
 from app.core.security import (
     hash_password,
     verify_password,
@@ -21,7 +24,8 @@ from app.core.mail import (
     send_verification_email,
     verify_token,
     send_welcome_email,
-    generate_reset_token
+    generate_reset_token,
+    verify_reset_token
 )
 from app.core.security import (
     hash_password,
@@ -230,3 +234,28 @@ async def forgot_password(
     background_tasks.add_task(send_reset_email, user.email, token)
 
     return generic_response
+
+def reset_password(db: Session, data: ResetPasswordRequest) -> dict:
+    # Validate the reset token (1 hour expiry)
+    email = verify_reset_token(data.token)
+
+    if email is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset link is invalid or has expired"
+        )
+
+    # Find the user
+    user = db.query(User).filter(User.email == email).first()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Hash and save the new password
+    user.hashed_password = hash_password(data.new_password)
+    db.commit()
+
+    return {"message": "Password reset successfully. You can now log in."}

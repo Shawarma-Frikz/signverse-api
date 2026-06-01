@@ -13,7 +13,8 @@ from app.core.dependencies import get_current_user
 from app.schemas.user import (
     UserRegister, UserLogin, TokenResponse,
     UserResponse, UserUpdate, RefreshRequest,
-    ResendVerificationRequest, ForgotPasswordRequest
+    ResendVerificationRequest, ForgotPasswordRequest,
+    ResetPasswordRequest
 )
 from app.services import auth as auth_service
 from app.models.user import User
@@ -81,3 +82,10 @@ async def forgot_password(
     db: Session = Depends(get_db)
 ):
     return await auth_service.forgot_password(db, data.email, background_tasks)
+
+@router.post("/reset-password")
+def reset_password(
+    data: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    return auth_service.reset_password(db, data)
