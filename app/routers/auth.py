@@ -53,8 +53,12 @@ def update_me(
     return auth_service.update_user(db, current_user, data)
 
 @router.get("/verify-email")
-def verify_email(token: str, db: Session = Depends(get_db)):
-    return auth_service.verify_email(db, token)
+def verify_email(
+    token: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    return auth_service.verify_email(db, token, background_tasks)
 
 @router.post("/resend-verification")
 async def resend_verification(
