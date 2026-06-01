@@ -1,3 +1,5 @@
+import token
+
 import resend
 from itsdangerous import URLSafeTimedSerializer
 from app.core.config import settings
@@ -56,5 +58,16 @@ async def send_welcome_email(email: str, display_name: str):
         "from": settings.mail_from,
         "to": email,
         "subject": f"Welcome to SignVerse, {name} 👋",
+        "html": html,
+    })
+
+async def send_reset_email(email: str, token: str):
+    reset_url = f"{settings.frontend_url}/api/v1/auth/reset-password?token={token}"
+    html = _load_template("reset_password_email.html").replace("{{reset_url}}", reset_url)
+
+    resend.Emails.send({
+        "from": settings.mail_from,
+        "to": email,
+        "subject": "Reset your SignVerse password",
         "html": html,
     })
