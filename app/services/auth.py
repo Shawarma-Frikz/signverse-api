@@ -35,6 +35,8 @@ from app.core.security import (
     decode_token
 )
 
+from app.models.used_token import UsedToken
+
 async def register_user(
     db: Session,
     data: UserRegister,
@@ -245,6 +247,17 @@ def reset_password(db: Session, data: ResetPasswordRequest) -> dict:
             detail="Reset link is invalid or has expired"
         )
 
+    # Check if token has already been used
+    already_used = db.query(UsedToken).filter(
+        UsedToken.token == data.token
+    ).first()
+
+    if already_used:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset link has already been used"
+        )
+
     # Find the user
     user = db.query(User).filter(User.email == email).first()
 
@@ -256,6 +269,11 @@ def reset_password(db: Session, data: ResetPasswordRequest) -> dict:
 
     # Hash and save the new password
     user.hashed_password = hash_password(data.new_password)
+
+    # Mark token as used — can never be used again
+    used_token = UsedToken(token=data.token)
+    db.add(used_token)
+
     db.commit()
 
     return {"message": "Password reset successfully. You can now log in."}
