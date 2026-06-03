@@ -220,3 +220,4 @@ __marimo__/
 # Dataset
 ml/datasets/
 *.zip
+ml/processed/
