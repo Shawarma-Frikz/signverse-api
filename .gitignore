@@ -221,3 +221,4 @@ __marimo__/
 ml/datasets/
 *.zip
 ml/processed/
+ml/models/
