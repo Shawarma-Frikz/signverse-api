@@ -15,17 +15,12 @@ email-validator
 slowapi
 
 #ml dependencies
-torch
 mediapipe
 opencv-python
 numpy
 tqdm
 scikit-learn
-tensorflow==2.12.0  # Requires Python 3.8-3.11 on Windows
-# tflite-runtime is optional; the app falls back to full TensorFlow when unavailable
-# tflite-runtime not installed on Windows via pip for this Python version;
-# the app falls back to full TensorFlow (tf.lite.Interpreter) when tflite-runtime
-# is unavailable, so functionality is unchanged.
 
 #others
 kaggle
+tflite-runtime

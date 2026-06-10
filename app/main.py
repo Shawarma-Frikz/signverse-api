@@ -6,6 +6,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.routers import auth
+from app.routers import predict
 
 # Create limiter — identifies users by IP address
 limiter = Limiter(key_func=get_remote_address)
@@ -32,6 +33,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(predict.router, prefix="/api/v1")
 
 @app.get("/health", tags=["Health"])
 async def health():

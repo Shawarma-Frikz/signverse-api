@@ -86,20 +86,11 @@ if not cap.isOpened():
     print("ERROR: Could not open webcam.")
     exit()
 
-# [NEW] Force the webcam to capture at a higher resolution (1280x720)
-# This prevents the video from looking blurry when the window is larger.
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-
 print("Webcam open. Press Q to quit.")
 prev_time = 0
 current_letter = "?"
 current_conf   = 0.0
 top3           = []
-
-# [NEW] Setup Window Size
-cv2.namedWindow("SignVerse — ASL Alphabet", cv2.WINDOW_NORMAL)
-cv2.resizeWindow("SignVerse — ASL Alphabet", 1280, 720) 
 
 with mp.tasks.vision.HandLandmarker.create_from_options(options) as landmarker:
     while True:
