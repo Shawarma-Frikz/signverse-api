@@ -222,3 +222,6 @@ ml/datasets/
 *.zip
 ml/processed/
 ml/models/
+
+#model
+app/ml_models/*.tflite
