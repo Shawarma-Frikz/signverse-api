@@ -6,6 +6,7 @@ import urllib.request
 import os
 import sys
 import torch
+import json
 
 # ── Setup ─────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(__file__))
@@ -29,6 +30,17 @@ model.load_state_dict(state_dict, strict=False)
 model.eval()
 print("TGCN model loaded.")
 
+# ── Load label map ────────────────────────────────────────────────
+idx_to_gloss = {}
+with open("ml/processed/wlasl_class_list.txt", "r") as f:
+    for line in f:
+        line = line.strip()
+        if line:
+            # The file format is "index word" (e.g., "0 book")
+            idx, gloss = line.split(maxsplit=1)
+            idx_to_gloss[int(idx)] = gloss
+print(f"Loaded {len(idx_to_gloss)} labels from wlasl_class_list.txt.")
+
 # ── Download MediaPipe model if needed ────────────────────────────
 if not os.path.exists(HAND_MODEL_PATH):
     print("Downloading hand landmarker model...")
@@ -41,7 +53,7 @@ if not os.path.exists(HAND_MODEL_PATH):
 # ── MediaPipe setup ───────────────────────────────────────────────
 options = mp.tasks.vision.HandLandmarkerOptions(
     base_options=mp.tasks.BaseOptions(model_asset_path=HAND_MODEL_PATH),
-    running_mode=mp.tasks.vision.RunningMode.IMAGE,
+    running_mode=mp.tasks.vision.RunningMode.VIDEO,
     num_hands=2,
     min_hand_detection_confidence=0.5,
     min_hand_presence_confidence=0.5,
@@ -66,10 +78,10 @@ def draw_landmarks(frame, hand_landmarks):
         color = (0, 255, 220) if i in (4,8,12,16,20) else (255,255,255)
         cv2.circle(frame, (px, py), 6 if i in (4,8,12,16,20) else 4, color, -1)
 
-def extract_keypoints(frame_bgr, landmarker):
+def extract_keypoints(frame_bgr, landmarker, timestamp_ms):
     rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-    result = landmarker.detect(mp_image)
+    result = landmarker.detect_for_video(mp_image, timestamp_ms)
     keypoints = np.zeros((55, 2), dtype=np.float32)
     if result.hand_landmarks:
         for hand_idx, hand in enumerate(result.hand_landmarks[:2]):
@@ -89,7 +101,11 @@ def predict(frame_buffer):
         output = model(x)
         probs  = torch.softmax(output, dim=1)[0]
         top5_vals, top5_idxs = probs.topk(5)
-    return [(idx.item(), val.item()) for idx, val in zip(top5_idxs, top5_vals)]
+        
+    return [
+        (idx_to_gloss.get(idx.item(), f"?{idx.item()}"), val.item())
+        for idx, val in zip(top5_idxs, top5_vals)
+    ]
 
 # ── Webcam ────────────────────────────────────────────────────────
 cap = cv2.VideoCapture(0)
@@ -101,7 +117,7 @@ print(f"Webcam open. Press Q to quit.")
 
 frame_buffer  = []
 current_top5  = []
-current_idx   = "—"
+current_word  = "—"
 current_conf  = 0.0
 prev_time     = 0
 hand_detected = False
@@ -113,7 +129,8 @@ with mp.tasks.vision.HandLandmarker.create_from_options(options) as landmarker:
             break
 
         frame = cv2.flip(frame, 1)
-        keypoints, landmarks = extract_keypoints(frame, landmarker)
+        timestamp_ms = int(time.time() * 1000)
+        keypoints, landmarks = extract_keypoints(frame, landmarker, timestamp_ms)
         hand_detected = landmarks is not None and len(landmarks) > 0
 
         if hand_detected:
@@ -125,7 +142,7 @@ with mp.tasks.vision.HandLandmarker.create_from_options(options) as landmarker:
 
         if len(frame_buffer) >= BUFFER_SIZE:
             current_top5 = predict(frame_buffer)
-            current_idx  = str(current_top5[0][0])
+            current_word = current_top5[0][0]
             current_conf = current_top5[0][1]
 
         # ── UI ────────────────────────────────────────────────────
@@ -144,19 +161,23 @@ with mp.tasks.vision.HandLandmarker.create_from_options(options) as landmarker:
         cv2.putText(frame, f"{'Buffering' if buf_pct < 1 else 'Ready'} {int(buf_pct*100)}%",
                     (w-240, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,188,212), 1)
 
-        # Prediction — showing class index for now
-        cv2.putText(frame, "Class index:", (w-240, 85),
+        # Prediction — showing word
+        cv2.putText(frame, "Prediction:", (w-240, 85),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (90,130,180), 1)
-        cv2.putText(frame, current_idx, (w-240, 135),
-                    cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0,255,200), 3)
-        cv2.putText(frame, f"{current_conf*100:.1f}%", (w-240, 165),
+
+        # Show word — use smaller font if word is long
+        word = current_top5[0][0].upper() if current_top5 else "—"
+        font_scale = 1.5 if len(word) <= 6 else 0.9
+        cv2.putText(frame, word, (w-240, 140),
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,255,200), 3)
+        cv2.putText(frame, f"{current_conf*100:.1f}%", (w-240, 170),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,188,212), 2)
 
-        # Top 5 indices
+        # Top 5 words
         cv2.putText(frame, "Top 5:", (w-240, 200),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (90,130,180), 1)
-        for i, (idx, prob) in enumerate(current_top5):
-            cv2.putText(frame, f"{i+1}. class {idx}: {prob*100:.1f}%",
+        for i, (word, prob) in enumerate(current_top5):
+            cv2.putText(frame, f"{i+1}. {word}: {prob*100:.1f}%",
                         (w-240, 225 + i*22),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45,
                         (0,255,200) if i == 0 else (150,150,150), 1)
