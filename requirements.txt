@@ -21,7 +21,7 @@ opencv-python
 numpy
 tqdm
 scikit-learn
-tensorflow>=2.16.0,<3  # Python 3.12 compatible; 2.12.0 only supports Python 3.8-3.11
+tensorflow==2.12.0  # Requires Python 3.8-3.11 on Windows
 # tflite-runtime is optional; the app falls back to full TensorFlow when unavailable
 # tflite-runtime not installed on Windows via pip for this Python version;
 # the app falls back to full TensorFlow (tf.lite.Interpreter) when tflite-runtime
