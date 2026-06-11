@@ -17,3 +17,5 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     translations = relationship("Translation", back_populates="user")
+
+    feedbacks = relationship("PredictionFeedback", back_populates="user")

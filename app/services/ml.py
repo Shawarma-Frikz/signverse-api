@@ -1,6 +1,10 @@
 import json
 import numpy as np
 from pathlib import Path
+from sqlalchemy.orm import Session
+from app.models.feedback import PredictionFeedback
+from app.schemas.prediction import FeedbackRequest
+from app.models.user import User
 
 # Try lightweight runtime first, fall back to full TF
 try:
@@ -70,3 +74,29 @@ def predict_alphabet(landmarks: list[float]) -> dict:
         "confidence": confidence,
         "top5":       top5,
     }
+
+def save_feedback(db: Session, data: FeedbackRequest, user: User) -> PredictionFeedback:
+    """Save a wrong prediction for future retraining."""
+
+    # Validate model_type
+    if data.model_type not in ("alphabet", "word"):
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="model_type must be 'alphabet' or 'word'"
+        )
+
+    feedback = PredictionFeedback(
+        user_id         = user.id,
+        model_type      = data.model_type,
+        predicted_label = data.predicted_label,
+        correct_label   = data.correct_label,
+        confidence      = data.confidence,
+        landmarks       = json.dumps(data.landmarks) if data.landmarks else None,
+    )
+
+    db.add(feedback)
+    db.commit()
+    db.refresh(feedback)
+
+    return feedback
