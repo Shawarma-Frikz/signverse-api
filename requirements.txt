@@ -23,4 +23,4 @@ scikit-learn
 
 #others
 kaggle
-tflite-runtime
+tensorflow>=2.16.0,<3
