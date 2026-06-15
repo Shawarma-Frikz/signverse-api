@@ -14,9 +14,9 @@ except ImportError:
     Interpreter = tf.lite.Interpreter
 
 # ── Paths ─────────────────────────────────────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-MODEL_PATH = PROJECT_ROOT / "ml" / "models" / "alphabet_model.tflite"
-LABEL_MAP_PATH = PROJECT_ROOT / "ml" / "processed" / "label_map.json"
+PROJECT_ROOT   = Path(__file__).resolve().parents[1]
+MODEL_PATH     = PROJECT_ROOT / "ml_models" / "alphabet_model.tflite"
+LABEL_MAP_PATH = PROJECT_ROOT / "ml_models" / "label_map.json"
 
 # ── Load label map ────────────────────────────────────────────────
 with open(LABEL_MAP_PATH) as f:
@@ -24,12 +24,15 @@ with open(LABEL_MAP_PATH) as f:
 
 idx_to_label = {v: k for k, v in label_map.items()}
 
-# ── Load TFLite model ─────────────────────────────────────────────
+# ── Load TFLite model once at startup ────────────────────────────
 interpreter = Interpreter(model_path=str(MODEL_PATH))
 interpreter.allocate_tensors()
 
+# Cache these — fetching them on every call adds unnecessary overhead
 input_details  = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
+input_index    = input_details[0]['index']
+output_index   = output_details[0]['index']
 
 print(f"Alphabet model loaded.")
 print(f"  Input  : {input_details[0]['shape']}")
@@ -40,7 +43,7 @@ print(f"  Classes: {len(idx_to_label)}")
 def predict_alphabet(landmarks: list[float]) -> dict:
     """
     Accept 63 landmark values (21 landmarks × x,y,z).
-    Returns predicted letter and confidence.
+    Returns predicted letter, confidence, and top 5.
     """
     if len(landmarks) != 63:
         raise ValueError(f"Expected 63 landmarks, got {len(landmarks)}")
@@ -48,19 +51,19 @@ def predict_alphabet(landmarks: list[float]) -> dict:
     # Prepare input
     sample = np.array([landmarks], dtype=np.float32)  # (1, 63)
 
-    # Run inference
-    interpreter.set_tensor(input_details[0]['index'], sample)
+    # Run inference — using cached indices for speed
+    interpreter.set_tensor(input_index, sample)
     interpreter.invoke()
-    output = interpreter.get_tensor(output_details[0]['index'])[0]
+    output = interpreter.get_tensor(output_index)[0]
 
     # Softmax
     exp_out = np.exp(output - np.max(output))
     probs   = exp_out / exp_out.sum()
 
     # Top prediction
-    pred_idx    = int(np.argmax(probs))
-    confidence  = float(probs[pred_idx])
-    letter      = idx_to_label[pred_idx]
+    pred_idx   = int(np.argmax(probs))
+    confidence = float(probs[pred_idx])
+    letter     = idx_to_label[pred_idx]
 
     # Top 5
     top5_indices = np.argsort(probs)[::-1][:5]
@@ -75,10 +78,10 @@ def predict_alphabet(landmarks: list[float]) -> dict:
         "top5":       top5,
     }
 
+
 def save_feedback(db: Session, data: FeedbackRequest, user: User) -> PredictionFeedback:
     """Save a wrong prediction for future retraining."""
 
-    # Validate model_type
     if data.model_type not in ("alphabet", "word"):
         from fastapi import HTTPException, status
         raise HTTPException(
