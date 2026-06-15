@@ -13,6 +13,8 @@ itsdangerous
 bcrypt==4.0.1
 email-validator
 slowapi
+jinja2
+python-multipartpip install jinja2
 
 #ml dependencies
 mediapipe
