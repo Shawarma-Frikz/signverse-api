@@ -1,15 +1,12 @@
-from fastapi import (
-    APIRouter,
-    Depends,
-    status,
-    BackgroundTasks,
-    Request
-)
+from fastapi import APIRouter, Depends, status, BackgroundTasks, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.mail import verify_reset_token
 from app.schemas.user import (
     UserRegister, UserLogin, TokenResponse,
     UserResponse, UserUpdate, RefreshRequest,
@@ -18,11 +15,36 @@ from app.schemas.user import (
 )
 from app.services import auth as auth_service
 from app.models.user import User
+import os
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 limiter = Limiter(key_func=get_remote_address)
 
+# Jinja2 templates
+TEMPLATES_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "templates"
+)
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
+
+@router.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request, token: str):
+    """Serves the branded HTML reset password form."""
+    # Validate token before showing the form
+    email = verify_reset_token(token)
+    token_valid = email is not None
+
+    return templates.TemplateResponse(
+        "reset_password_page.html",
+        {
+            "request": request,
+            "token": token,
+            "token_valid": token_valid,
+        }
+    )
+
+
+# ── All your existing endpoints below unchanged ───────────────────
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     data: UserRegister,
@@ -59,6 +81,7 @@ def update_me(
 ):
     return auth_service.update_user(db, current_user, data)
 
+
 @router.get("/verify-email")
 def verify_email(
     token: str,
@@ -67,13 +90,17 @@ def verify_email(
 ):
     return auth_service.verify_email(db, token, background_tasks)
 
+
 @router.post("/resend-verification")
 async def resend_verification(
     data: ResendVerificationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    return await auth_service.resend_verification(db, data.email, background_tasks)
+    return await auth_service.resend_verification(
+        db, data.email, background_tasks
+    )
+
 
 @router.post("/forgot-password")
 async def forgot_password(
@@ -81,7 +108,10 @@ async def forgot_password(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    return await auth_service.forgot_password(db, data.email, background_tasks)
+    return await auth_service.forgot_password(
+        db, data.email, background_tasks
+    )
+
 
 @router.post("/reset-password")
 def reset_password(
