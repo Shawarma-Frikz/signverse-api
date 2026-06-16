@@ -29,15 +29,13 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 @router.get("/reset-password", response_class=HTMLResponse)
 async def reset_password_page(request: Request, token: str):
-    """Serves the branded HTML reset password form."""
-    # Validate token before showing the form
     email = verify_reset_token(token)
     token_valid = email is not None
 
     return templates.TemplateResponse(
-        "reset_password_page.html",
-        {
-            "request": request,
+        request=request,
+        name="reset_password_page.html",
+        context={
             "token": token,
             "token_valid": token_valid,
         }
