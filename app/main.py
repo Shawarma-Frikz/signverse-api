@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -5,8 +6,17 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
-from app.routers import auth
-from app.routers import predict
+from app.routers import auth, predict, translations
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Runs once at startup — loads model into memory
+    print("Loading ML models...")
+    from app.services import ml  # noqa — triggers module-level model loading
+    print("ML models ready.")
+    yield
+    # Runs on shutdown
+    print("Shutting down.")
 
 # Create limiter — identifies users by IP address
 limiter = Limiter(key_func=get_remote_address)
@@ -16,6 +26,7 @@ app = FastAPI(
     version=settings.version,
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,  # <-- ADDED: Connects the lifespan context manager
 )
 
 # Attach limiter to app state
@@ -34,6 +45,8 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(predict.router, prefix="/api/v1")
+app.include_router(translations.router,  prefix="/api/v1")
+
 
 @app.get("/health", tags=["Health"])
 async def health():
