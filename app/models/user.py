@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -6,16 +6,17 @@ from app.core.database import Base
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    display_name = Column(String, nullable=True)
-    preferred_language = Column(String, default="fr")
-    is_active = Column(Boolean, default=True)
-    is_verified = Column(Boolean, default=False)  # NEW
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id                 = Column(Integer, primary_key=True, index=True)
+    email              = Column(String, unique=True, index=True, nullable=False)
+    hashed_password    = Column(String, nullable=False)
+    display_name       = Column(String, nullable=True)
+    bio                = Column(Text, nullable=True)           # ← new
+    avatar_url         = Column(String, nullable=True)         # ← new
+    preferred_language = Column(String, default="en")
+    is_active          = Column(Boolean, default=True)
+    is_verified        = Column(Boolean, default=False)
+    created_at         = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at         = Column(DateTime(timezone=True), onupdate=func.now())
 
     translations = relationship("Translation", back_populates="user")
-
-    feedbacks = relationship("PredictionFeedback", back_populates="user")
+    feedbacks    = relationship("PredictionFeedback", back_populates="user")

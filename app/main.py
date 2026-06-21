@@ -6,7 +6,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
-from app.routers import auth, predict, translations
+from app.routers import auth, predict, translations, users
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -46,7 +46,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(predict.router, prefix="/api/v1")
 app.include_router(translations.router,  prefix="/api/v1")
-
+app.include_router(users.router,        prefix="/api/v1")
 
 @app.get("/health", tags=["Health"])
 async def health():

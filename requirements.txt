@@ -14,7 +14,8 @@ bcrypt==4.0.1
 email-validator
 slowapi
 jinja2
-python-multipart
+Pillow
+
 
 #ml dependencies
 mediapipe
