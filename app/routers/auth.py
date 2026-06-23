@@ -7,7 +7,8 @@ from slowapi.util import get_remote_address
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.mail import verify_reset_token
-from app.core.security import verify_password, get_password_hash
+# Updated import: changed get_password_hash to hash_password
+from app.core.security import verify_password, hash_password
 from app.schemas.user import (
     UserRegister, UserLogin, TokenResponse,
     UserResponse, UserUpdate, RefreshRequest,
@@ -146,8 +147,8 @@ def change_password(
             detail="New password must be different from current password.",
         )
 
-    # Update password
-    current_user.hashed_password = get_password_hash(data.new_password)
+    # Update password (using your actual function name: hash_password)
+    current_user.hashed_password = hash_password(data.new_password)
     db.commit()
 
     return {"message": "Password changed successfully."}
