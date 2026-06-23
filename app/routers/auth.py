@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, status, BackgroundTasks, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -7,11 +7,12 @@ from slowapi.util import get_remote_address
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.mail import verify_reset_token
+from app.core.security import verify_password, get_password_hash
 from app.schemas.user import (
     UserRegister, UserLogin, TokenResponse,
     UserResponse, UserUpdate, RefreshRequest,
     ResendVerificationRequest, ForgotPasswordRequest,
-    ResetPasswordRequest
+    ResetPasswordRequest, ChangePasswordRequest
 )
 from app.services import auth as auth_service
 from app.models.user import User
@@ -117,3 +118,36 @@ def reset_password(
     db: Session = Depends(get_db)
 ):
     return auth_service.reset_password(db, data)
+
+
+@router.post("/change-password")
+def change_password(
+    data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Verify current password
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+
+    # Validate new password
+    if len(data.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password must be at least 8 characters.",
+        )
+
+    if data.current_password == data.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password must be different from current password.",
+        )
+
+    # Update password
+    current_user.hashed_password = get_password_hash(data.new_password)
+    db.commit()
+
+    return {"message": "Password changed successfully."}
