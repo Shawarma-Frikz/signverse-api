@@ -7,6 +7,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.routers import auth, predict, translations, users
+from fastapi.staticfiles import StaticFiles
+import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -51,3 +53,7 @@ app.include_router(users.router,        prefix="/api/v1")
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "ok", "version": settings.version}
+
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
